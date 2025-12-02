@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Face Registration & Verification</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<h2>Face Recognition Web Test</h2>
+
+<div class="container">
+
+    <!-- Left: Profile Registration -->
+    <div class="box">
+        <h3>1. Upload Foto Profile</h3>
+
+        <input type="text" id="user_id" placeholder="Masukkan User ID"><br><br>
+        <input type="file" id="profile_input"><br><br>
+
+        <button onclick="uploadProfile()">Upload Profile</button>
+
+        <h4>Profile Tersimpan:</h4>
+        <img id="profile_preview" width="200">
+    </div>
+
+    <!-- Right: Camera Verification -->
+    <div class="box">
+        <h3>2. Ambil Foto Kamera</h3>
+
+        <video id="camera" width="250" autoplay></video><br>
+        <button onclick="capture()">Capture & Verify</button><br><br>
+
+        <canvas id="canvas" width="250" height="200" style="display:none"></canvas>
+        <img id="captured_img" width="200">
+
+        <h3 id="result"></h3>
+    </div>
+
+</div>
+
+<script>
+// Start camera
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => {
+    document.getElementById("camera").srcObject = stream;
+});
+
+// Upload profile photo
+function uploadProfile() {
+    const userId = document.getElementById("user_id").value;
+    const fileInput = document.getElementById("profile_input").files[0];
+
+    if (!userId || !fileInput) {
+        alert("Isi user id & pilih foto.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("image", fileInput);
+
+    fetch("/upload_profile", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert("Profile uploaded!");
+        document.getElementById("profile_preview").src = `/assets/${userId}.jpg`;
+    });
+}
+
+// Capture from camera & verify
+function capture() {
+    const userId = document.getElementById("user_id").value;
+    if (!userId) {
+        alert("Isi user ID dulu");
+        return;
+    }
+
+    let video = document.getElementById("camera");
+    let canvas = document.getElementById("canvas");
+    let context = canvas.getContext("2d");
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    let imgData = canvas.toDataURL("image/jpeg");
+
+    document.getElementById("captured_img").src = imgData;
+
+    let blob = dataURLtoBlob(imgData);
+    let formData = new FormData();
+    formData.append("user_id", userId);
+    formData.append("image", blob, "capture.jpg");
+
+    fetch("/verify", {
+        method: "POST",
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.match) {
+            document.getElementById("result").innerHTML = "✔ MATCH (Wajah Cocok)";
+            document.getElementById("result").style.color = "green";
+        } else {
+            document.getElementById("result").innerHTML = "❌ NOT MATCH (Tidak Cocok)";
+            document.getElementById("result").style.color = "red";
+        }
+    });
+}
+
+function dataURLtoBlob(dataURL) {
+    const byteString = atob(dataURL.split(",")[1]);
+    const mimeString = dataURL.split(",")[0].split(":")[1].split(";")[0];
+    const buffer = new ArrayBuffer(byteString.length);
+    const dataView = new Uint8Array(buffer);
+    for (let i = 0; i < byteString.length; i++) {
+        dataView[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([buffer], { type: mimeString });
+}
+</script>
+
+</body>
+</html>

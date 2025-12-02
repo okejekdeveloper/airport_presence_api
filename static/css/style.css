@@ -1,0 +1,16 @@
+body {
+    font-family: Arial;
+    margin: 20px;
+}
+
+.container {
+    display: flex;
+    gap: 40px;
+}
+
+.box {
+    padding: 20px;
+    border: 1px solid #aaa;
+    border-radius: 10px;
+    width: 300px;
+}
