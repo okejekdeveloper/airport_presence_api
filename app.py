@@ -1,54 +1,41 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from deepface import DeepFace
 import os
+import tempfile
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["UPLOAD_FOLDER"] = "assets"
 
-# Buat folder assets kalau belum ada
 if not os.path.exists("assets"):
     os.makedirs("assets")
 
 @app.route("/")
 def home():
-    profiles = os.listdir("assets")
-    return render_template("index.html", profiles=profiles)
+    return render_template("index.html")
 
-@app.route("/upload_profile", methods=["POST"])
-def upload_profile():
-    file = request.files.get("image")
-    user_id = request.form.get("user_id")
-
-    if not file or not user_id:
-        return jsonify({"error": "image and user_id are required"}), 400
-
-    file_path = f"assets/{user_id}.jpg"
-    file.save(file_path)
-
-    return jsonify({"message": "Profile uploaded", "path": file_path})
-
-@app.route("/verify", methods=["POST"])
+@app.route("/api/v1/verify", methods=["POST"])
 def verify_face():
-    file = request.files.get("image")
-    user_id = request.form.get("user_id")
+    source_image = request.files.get("source_image") # gambar yang akan divalidasi
+    target_image = request.files.get("target_image") # gambar referensi
 
-    if not file or not user_id:
-        return jsonify({"error": "image and user_id required"}), 400
+    if not source_image or not target_image:
+        return jsonify({"error": "source_image & target_image harus dikirim"}), 400
 
-    temp_path = "temp.jpg"
-    file.save(temp_path)
+    source_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    target_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
 
-    profile_path = f"assets/{user_id}.jpg"
-
-    if not os.path.exists(profile_path):
-        return jsonify({"error": "Profile not found"}), 404
+    source_image.save(source_tmp.name)
+    target_image.save(target_tmp.name)
 
     try:
         result = DeepFace.verify(
-            img1_path=temp_path,
-            img2_path=profile_path,
+            img1_path=source_tmp.name,
+            img2_path=target_tmp.name,
             model_name="Facenet"
         )
+
+        os.unlink(source_tmp.name)
+        os.unlink(target_tmp.name)
 
         return jsonify({
             "match": result["verified"],
@@ -56,6 +43,9 @@ def verify_face():
         })
 
     except Exception as e:
+        if os.path.exists(source_tmp.name): os.unlink(source_tmp.name)
+        if os.path.exists(target_tmp.name): os.unlink(target_tmp.name)
+
         return jsonify({"error": str(e)}), 500
 
 @app.route("/assets/<path:filename>")
